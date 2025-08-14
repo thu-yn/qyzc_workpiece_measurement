@@ -1,0 +1,51 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/moyuan/catkin_ws/devel/include/**",
+        "/opt/ros/noetic/include/**",
+        "/home/moyuan/catkin_ws/src/bp_identifier/include/**",
+        "/home/moyuan/catkin_ws/src/third_party/vision_opencv/cv_bridge/include/**",
+        "/home/moyuan/catkin_ws/src/darknet_ros/darknet_ros/include/**",
+        "/home/moyuan/catkin_ws/src/gem-fast-lio/elevation_mapping/include/**",
+        "/home/moyuan/catkin_ws/src/gem-fast-lio/FAST_LIO/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/sentry_slam/FAST_LIO_LOCALIZATION/include/**",
+        "/home/moyuan/catkin_ws/src/third_party/fdilink_ahrs/include/**",
+        "/home/moyuan/catkin_ws/src/foot_grid_map_processor/include/**",
+        "/home/moyuan/catkin_ws/src/gpd-forward/include/**",
+        "/home/moyuan/catkin_ws/src/hydro_arm_func/hydro_arm/include/**",
+        "/home/moyuan/catkin_ws/src/third_party/vision_opencv/image_geometry/include/**",
+        "/home/moyuan/catkin_ws/src/kindr/include/**",
+        "/home/moyuan/catkin_ws/src/kindr_ros/kindr_ros/include/**",
+        "/home/moyuan/catkin_ws/src/kindr_ros/kindr_rviz_plugins/include/**",
+        "/home/moyuan/catkin_ws/src/kindr_ros/multi_dof_joint_trajectory_rviz_plugins/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/sentry_slam/Point-LIO/include/**",
+        "/home/moyuan/catkin_ws/src/point_lio_unilidar/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/pointcloud_to_laserscan-1.4.1/include/**",
+        "/home/moyuan/ny_qyzc_ws/src/pose_measurement/include/**",
+        "/home/moyuan/catkin_ws/src/third_party/realsense-ros-ros1-legacy/realsense2_camera/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/sentry_http/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/sentry_waypoint_navigator/include/**",
+        "/home/moyuan/catkin_ws/src/unitree_ros/unitree_controller/include/**",
+        "/home/moyuan/catkin_ws/src/unitree_ros/unitree_legged_control/include/**",
+        "/home/moyuan/catkin_ws/src/unitree_ros/unitree_ros_to_real/unitree_legged_real/include/**",
+        "/home/moyuan/catkin_ws/src/unitree_ros/unitree_legged_sdk/include/**",
+        "/home/moyuan/catkin_ws/src/unitree_lidar_ros/include/**",
+        "/home/moyuan/catkin_ws/src/usb_cam-0.3.7/include/**",
+        "/home/moyuan/catkin_ws/src/sentry_navigation-master/sentry_tools/velocity_smoother_ema/include/**",
+        "/home/moyuan/catkin_ws/src/yolov8_seg_ros/yolov8_seg/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-arm64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

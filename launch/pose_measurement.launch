@@ -1,0 +1,49 @@
+<launch>
+     <!-- Pose Measurement Launch File -->
+     
+     <!-- Arguments -->
+     <arg name="reference_pcd" default="$(find pose_measurement)/data/reference.pcd" 
+          doc="Path to reference PCD file"/>
+     <arg name="target_pcd" default="" 
+          doc="Path to target PCD file (empty for interactive mode)"/>
+     <arg name="output_csv" default="$(find pose_measurement)/results/measurements.csv" 
+          doc="Output CSV file path"/>
+     <arg name="enable_csv" default="true" 
+          doc="Enable CSV output"/>
+     
+     <!-- Algorithm parameters -->
+     <arg name="voxel_size" default="0.005" 
+          doc="Voxel grid size for downsampling (meters)"/>
+     <arg name="icp_max_iter" default="100" 
+          doc="Maximum ICP iterations"/>
+     <arg name="icp_epsilon" default="1e-6" 
+          doc="ICP transformation epsilon"/>
+     
+     <!-- Advanced processing parameters -->
+     <arg name="enable_advanced" default="false" 
+          doc="Enable advanced point cloud processing and measurements"/>
+     <arg name="enable_plane_removal" default="true" 
+          doc="Enable plane removal in advanced processing"/>
+     <arg name="enable_clustering" default="true" 
+          doc="Enable clustering in advanced processing"/>
+     
+     <!-- Launch the pose measurement node -->
+     <node name="pose_measurement_node" pkg="pose_measurement" type="pose_measurement_node" output="screen">
+       <!-- File paths -->
+       <param name="reference_pcd_path" value="$(arg reference_pcd)"/>
+       <param name="target_pcd_path" value="$(arg target_pcd)"/>
+       <param name="output_csv_path" value="$(arg output_csv)"/>
+       <param name="enable_csv_output" value="$(arg enable_csv)"/>
+       
+       <!-- Algorithm parameters -->
+       <param name="voxel_size" value="$(arg voxel_size)"/>
+       <param name="icp_max_iterations" value="$(arg icp_max_iter)"/>
+       <param name="icp_transformation_epsilon" value="$(arg icp_epsilon)"/>
+       
+       <!-- Advanced processing parameters -->
+       <param name="enable_advanced_processing" value="$(arg enable_advanced)"/>
+       <param name="enable_plane_removal" value="$(arg enable_plane_removal)"/>
+       <param name="enable_clustering" value="$(arg enable_clustering)"/>
+     </node>
+     
+   </launch>
