@@ -1,49 +1,229 @@
+<!--
+文件名: pose_measurement.launch
+文件作用: ROS启动配置文件，定义姿态测量节点的启动参数和运行配置
+
+主要功能需求:
+1. 提供灵活的命令行参数接口，支持不同使用场景
+2. 配置文件路径参数（参考点云、目标点云、输出文件）
+3. 配置算法参数（体素大小、ICP参数等）
+4. 支持基础模式和扩展模式的切换
+5. 提供合理的默认值，便于快速使用
+
+使用场景:
+- 单文件处理：指定具体的目标点云文件
+- 交互模式：不指定目标文件，支持连续处理
+- 批量处理：与Python脚本配合使用
+- 算法调优：通过参数调整优化性能
+
+设计特点:
+- 参数化设计：所有重要参数都可外部配置
+- 文档友好：每个参数都有详细说明
+- 默认值合理：开箱即用的工业级参数
+- 模式切换：支持不同精度和速度需求
+-->
+
 <launch>
-     <!-- Pose Measurement Launch File -->
+     <!-- 姿态测量启动文件 -->
      
-     <!-- Arguments -->
+     <!-- ===== 文件路径参数 ===== -->
+     <!-- 
+     这些参数定义了输入和输出文件的路径
+     使用$(find package_name)确保路径的可移植性
+     -->
+     
+     <!-- 参考点云文件路径 -->
+     <!-- 默认路径假设数据文件存放在包的data目录下 -->
      <arg name="reference_pcd" default="$(find pose_measurement)/data/reference.pcd" 
           doc="Path to reference PCD file"/>
+          
+     <!-- 目标点云文件路径 -->
+     <!-- 默认为空，启用交互模式；指定路径则为单文件处理模式 -->
      <arg name="target_pcd" default="" 
           doc="Path to target PCD file (empty for interactive mode)"/>
+          
+     <!-- 输出CSV文件路径 -->
+     <!-- 默认保存在包的results目录下 -->
      <arg name="output_csv" default="$(find pose_measurement)/results/measurements.csv" 
           doc="Output CSV file path"/>
+          
+     <!-- 是否启用CSV输出 -->
+     <!-- 可以禁用CSV输出，只显示终端结果 -->
      <arg name="enable_csv" default="true" 
           doc="Enable CSV output"/>
      
-     <!-- Algorithm parameters -->
+     <!-- ===== 核心算法参数 ===== -->
+     <!-- 
+     这些参数控制点云处理和配准算法的精度与性能
+     可以根据具体应用场景进行调优
+     -->
+     
+     <!-- 体素网格大小 -->
+     <!-- 5mm是工业零件的常用精度，平衡性能和精度 -->
+     <!-- 小值：更高精度，更慢速度 -->
+     <!-- 大值：更快速度，较低精度 -->
      <arg name="voxel_size" default="0.005" 
           doc="Voxel grid size for downsampling (meters)"/>
+          
+     <!-- ICP最大迭代次数 -->
+     <!-- 100次适合大多数情况，复杂物体可增加到200 -->
      <arg name="icp_max_iter" default="100" 
           doc="Maximum ICP iterations"/>
+          
+     <!-- ICP收敛阈值 -->
+     <!-- 1e-6是高精度阈值，适合精密测量 -->
+     <!-- 可放宽到1e-4以加快速度 -->
      <arg name="icp_epsilon" default="1e-6" 
           doc="ICP transformation epsilon"/>
      
-     <!-- Advanced processing parameters -->
+     <!-- ===== 高级处理参数 ===== -->
+     <!-- 
+     这些参数控制扩展处理模式的功能
+     扩展模式提供更高精度但处理速度较慢
+     -->
+     
+     <!-- 启用高级处理模式 -->
+     <!-- false: 基础模式，快速处理 -->
+     <!-- true: 扩展模式，高精度处理 -->
      <arg name="enable_advanced" default="false" 
           doc="Enable advanced point cloud processing and measurements"/>
+          
+     <!-- 在高级模式中启用平面移除 -->
+     <!-- 自动检测和移除背景平面（桌面、地面等） -->
      <arg name="enable_plane_removal" default="true" 
           doc="Enable plane removal in advanced processing"/>
+          
+     <!-- 在高级模式中启用聚类分割 -->
+     <!-- 自动分离多个物体，选择最大聚类作为目标 -->
      <arg name="enable_clustering" default="true" 
           doc="Enable clustering in advanced processing"/>
      
-     <!-- Launch the pose measurement node -->
-     <node name="pose_measurement_node" pkg="pose_measurement" type="pose_measurement_node" output="screen">
-       <!-- File paths -->
+     <!-- ===== 节点启动配置 ===== -->
+     <!-- 
+     启动主要的姿态测量节点
+     output="screen"确保日志输出到终端
+     -->
+     <node name="pose_measurement_node" 
+           pkg="pose_measurement" 
+           type="pose_measurement_node" 
+           output="screen">
+           
+       <!-- ===== 文件路径参数传递 ===== -->
+       <!-- 将launch参数传递给节点内部参数 -->
        <param name="reference_pcd_path" value="$(arg reference_pcd)"/>
        <param name="target_pcd_path" value="$(arg target_pcd)"/>
        <param name="output_csv_path" value="$(arg output_csv)"/>
        <param name="enable_csv_output" value="$(arg enable_csv)"/>
        
-       <!-- Algorithm parameters -->
+       <!-- ===== 算法参数传递 ===== -->
+       <!-- 核心算法的配置参数 -->
        <param name="voxel_size" value="$(arg voxel_size)"/>
        <param name="icp_max_iterations" value="$(arg icp_max_iter)"/>
        <param name="icp_transformation_epsilon" value="$(arg icp_epsilon)"/>
        
-       <!-- Advanced processing parameters -->
+       <!-- ===== 高级处理参数传递 ===== -->
+       <!-- 扩展功能的开关和配置 -->
        <param name="enable_advanced_processing" value="$(arg enable_advanced)"/>
        <param name="enable_plane_removal" value="$(arg enable_plane_removal)"/>
        <param name="enable_clustering" value="$(arg enable_clustering)"/>
      </node>
      
-   </launch>
+</launch>
+
+<!--
+===== 使用示例 =====
+
+1. 基础单文件处理:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=/path/to/reference.pcd \
+     target_pcd:=/path/to/target.pcd
+
+2. 交互模式（连续处理多个文件）:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=/path/to/reference.pcd
+
+3. 高精度模式处理:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=/path/to/reference.pcd \
+     target_pcd:=/path/to/target.pcd \
+     enable_advanced:=true
+
+4. 自定义算法参数:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=/path/to/reference.pcd \
+     target_pcd:=/path/to/target.pcd \
+     voxel_size:=0.001 \
+     icp_max_iter:=200
+
+5. 小物体高精度处理:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=small_object_ref.pcd \
+     target_pcd:=small_object_tgt.pcd \
+     enable_advanced:=true \
+     voxel_size:=0.001 \
+     icp_max_iter:=200 \
+     icp_epsilon:=1e-8
+
+6. 大物体快速处理:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=large_object_ref.pcd \
+     target_pcd:=large_object_tgt.pcd \
+     voxel_size:=0.01 \
+     icp_max_iter:=50
+
+7. 仅显示结果不保存CSV:
+   roslaunch pose_measurement pose_measurement.launch \
+     reference_pcd:=/path/to/reference.pcd \
+     target_pcd:=/path/to/target.pcd \
+     enable_csv:=false
+
+===== 参数调优指南 =====
+
+针对不同应用场景的推荐参数组合:
+
+1. 工业质检（高精度）:
+   - voxel_size: 0.001-0.002
+   - icp_max_iter: 200
+   - icp_epsilon: 1e-8
+   - enable_advanced: true
+
+2. 机器人抓取（平衡）:
+   - voxel_size: 0.005
+   - icp_max_iter: 100
+   - icp_epsilon: 1e-6
+   - enable_advanced: true
+
+3. 实时处理（快速）:
+   - voxel_size: 0.01
+   - icp_max_iter: 50
+   - icp_epsilon: 1e-4
+   - enable_advanced: false
+
+4. 科研实验（最高精度）:
+   - voxel_size: 0.0005
+   - icp_max_iter: 500
+   - icp_epsilon: 1e-10
+   - enable_advanced: true
+
+===== 故障排除 =====
+
+1. 找不到文件错误:
+   - 检查PCD文件路径是否正确
+   - 确保data和results目录存在
+   - 使用绝对路径替代相对路径
+
+2. 处理速度过慢:
+   - 增大voxel_size到0.01
+   - 减少icp_max_iter到50
+   - 设置enable_advanced:=false
+
+3. 精度不满足要求:
+   - 减小voxel_size到0.001
+   - 增加icp_max_iter到200
+   - 设置enable_advanced:=true
+   - 减小icp_epsilon到1e-8
+
+4. 内存不足:
+   - 增大voxel_size减少点数
+   - 启用plane_removal移除背景
+   - 启用clustering选择目标物体
+-->

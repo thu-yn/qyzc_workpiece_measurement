@@ -1,3 +1,18 @@
+/**
+* @file pose_measurement_node.cpp
+* @brief 工件姿态估计和测量系统的主控制节点
+* 
+* 功能：
+* - 参数管理：读取和配置系统参数（体素大小、ICP参数、扩展模式开关等）
+* - 工作流控制：协调点云加载、姿态估计、几何测量的执行流程
+* - 双模式处理：支持单次处理模式和交互式连续处理模式
+* - 结果输出：格式化终端显示和CSV文件保存
+* - 错误处理：完善的文件加载检查和异常处理
+* 
+* 作为系统入口点，该节点通过PoseEstimator调用核心算法模块，
+* 为用户和外部脚本提供统一的ROS接口。
+*/
+
 #include <ros/ros.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
@@ -12,18 +27,22 @@ class PoseMeasurementNode {
 public:
     PoseMeasurementNode() : nh_("~") {
         // Initialize parameters
+        // 文件路径参数
         nh_.param<std::string>("reference_pcd_path", reference_pcd_path_, "");
         nh_.param<std::string>("target_pcd_path", target_pcd_path_, "");
         nh_.param<std::string>("output_csv_path", output_csv_path_, "measurements.csv");
-        nh_.param<bool>("enable_csv_output", enable_csv_output_, true);
+        // 核心处理参数
         nh_.param<float>("voxel_size", voxel_size_, 0.005f);  // 5mm
         nh_.param<int>("icp_max_iterations", icp_max_iterations_, 100);
         nh_.param<float>("icp_transformation_epsilon", icp_transformation_epsilon_, 1e-6);
+        // 功能开关
+        nh_.param<bool>("enable_csv_output", enable_csv_output_, true);
         nh_.param<bool>("enable_advanced_processing", enable_advanced_processing_, false);
         nh_.param<bool>("enable_plane_removal", enable_plane_removal_, true);
         nh_.param<bool>("enable_clustering", enable_clustering_, true);
         
         // Initialize pose estimator
+        // 初始化PoseEstimator类
         pose_estimator_ = std::make_shared<PoseEstimator>();
         pose_estimator_->setVoxelSize(voxel_size_);
         pose_estimator_->setICPMaxIterations(icp_max_iterations_);
@@ -31,6 +50,7 @@ public:
         pose_estimator_->setEnableAdvancedMeasurements(enable_advanced_processing_);
         
         // Configure advanced processing if enabled
+        // 高级处理
         if (enable_advanced_processing_) {
             pose_measurement::ProcessingParameters params;
             params.voxel_size = voxel_size_;
