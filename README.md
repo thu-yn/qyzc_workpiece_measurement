@@ -52,6 +52,7 @@ source devel/setup.bash
 
 ## 代码目录
 
+```
 pose_measurement/
 ├── CMakeLists.txt                           # 构建配置文件
 ├── package.xml                              # ROS包描述文件
@@ -85,6 +86,7 @@ pose_measurement/
     ├── result_target_001.csv                # 单独结果文件
     ├── merged_results.csv                   # 合并的批量结果
     └── ...                                  # 其他结果文件
+```
 
 ## 使用方法
 
