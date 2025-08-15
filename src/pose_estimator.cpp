@@ -8,12 +8,14 @@
 * 3. 实现配准质量评估算法（适配度和RMSE计算）
 * 4. 实现完整的错误处理和回退机制
 * 5. 提供高性能的工业级实现
+* 6. 实现独立的变换点云生成功能（新增）
 * 
 * 核心算法特点:
 * - 智能配准策略：先快后精，先简单后复杂
 * - 多重质量检查：每个阶段都有质量评估
 * - 自适应参数：根据数据特点动态调整
 * - 完善的回退机制：确保系统稳定性
+* - 独立变换功能：职责分离，按需使用
 * 
 * 工业应用优化:
 * - 预计算优化：参考点云PCA预计算
@@ -43,7 +45,8 @@ PoseEstimator::PoseEstimator()
     , icp_max_iterations_(100)               // ICP默认100次迭代
     , icp_transformation_epsilon_(1e-6)      // ICP收敛阈值
     , fpfh_radius_(0.025f)                   // FPFH特征半径25mm
-    , enable_advanced_measurements_(false) { // 默认使用基础模式
+    , enable_advanced_measurements_(false)   // 默认使用基础模式
+    , enable_downsampling_(true){            // 默认开启下采样
     
     // 初始化点云智能指针
     reference_cloud_.reset(new pcl::PointCloud<pcl::PointXYZ>);
@@ -143,22 +146,102 @@ MeasurementData PoseEstimator::processTargetCloud(pcl::PointCloud<pcl::PointXYZ>
 }
 
 /**
+* @brief 生成变换后的点云
+*/
+pcl::PointCloud<pcl::PointXYZ>::Ptr PoseEstimator::generateTransformedCloud(
+    pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud,
+    const Eigen::Matrix4f& transformation) {
+    
+    // 边界检查
+    if (!source_cloud || source_cloud->empty()) {
+        ROS_WARN("Empty or null source cloud provided for transformation");
+        return pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    }
+    
+    // 创建输出点云
+    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+    
+    // 应用变换矩阵
+    pcl::transformPointCloud(*source_cloud, *transformed_cloud, transformation);
+    
+    ROS_INFO("Generated transformed cloud with %zu points", transformed_cloud->size());
+    
+    return transformed_cloud;
+}
+
+/**
+* @brief 保存变换后的点云到PCD文件
+* 提供完整的文件保存功能和错误处理
+*/
+bool PoseEstimator::saveTransformedCloud(
+    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud,
+    const std::string& file_path) {
+    
+    // 边界检查
+    if (!transformed_cloud || transformed_cloud->empty()) {
+        ROS_ERROR("Cannot save empty or null transformed cloud");
+        return false;
+    }
+    
+    if (file_path.empty()) {
+        ROS_ERROR("Empty file path provided for saving transformed cloud");
+        return false;
+    }
+    
+    // 尝试保存PCD文件
+    try {
+        // 使用二进制格式保存，文件更小，加载更快
+        if (pcl::io::savePCDFileBinary(file_path, *transformed_cloud) == -1) {
+            ROS_ERROR("Failed to save transformed cloud to: %s", file_path.c_str());
+            return false;
+        }
+        
+        ROS_INFO("Successfully saved transformed cloud (%zu points) to: %s", 
+                transformed_cloud->size(), file_path.c_str());
+        return true;
+        
+    } catch (const std::exception& e) {
+        ROS_ERROR("Exception occurred while saving transformed cloud: %s", e.what());
+        return false;
+    }
+}
+
+/**
 * @brief 基础点云预处理
 * 提供快速的基础预处理，适用于基础模式
 */
 pcl::PointCloud<pcl::PointXYZ>::Ptr PoseEstimator::preprocessPointCloud(
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+
+    if (!cloud || cloud->empty()) {
+        ROS_WARN("Empty or null input cloud for preprocessing");
+        return pcl::PointCloud<pcl::PointXYZ>::Ptr(new pcl::PointCloud<pcl::PointXYZ>);
+    }
+    
+    ROS_INFO("Preprocessing cloud: %zu points", cloud->size());
     
     pcl::PointCloud<pcl::PointXYZ>::Ptr processed(new pcl::PointCloud<pcl::PointXYZ>);
     
-    // 统计异常值移除
+    // 统计异常值滤除
+    ROS_DEBUG("Applying statistical outlier removal...");
     outlier_filter_.setInputCloud(cloud);
     outlier_filter_.filter(*processed);
+    ROS_INFO("After outlier removal: %zu points", processed->size());
     
-    // 体素网格下采样
-    voxel_filter_.setInputCloud(processed);
-    voxel_filter_.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
-    voxel_filter_.filter(*processed);
+    // 下采样（条件）
+    if (enable_downsampling_ && voxel_size_ > 0.0f) {
+        ROS_INFO("Applying voxel grid downsampling (voxel size: %.6f)", voxel_size_);
+        
+        pcl::PointCloud<pcl::PointXYZ>::Ptr downsampled(new pcl::PointCloud<pcl::PointXYZ>);
+        voxel_filter_.setInputCloud(processed);
+        voxel_filter_.setLeafSize(voxel_size_, voxel_size_, voxel_size_);
+        voxel_filter_.filter(*downsampled);
+        
+        ROS_INFO("After downsampling: %zu points", downsampled->size());
+        processed = downsampled;
+    } else {
+        ROS_INFO("Downsampling disabled - maintaining original resolution");
+    }
     
     return processed;
 }
@@ -347,7 +430,6 @@ Eigen::Matrix4f PoseEstimator::fineRegistration(
 /**
 * @brief 计算几何测量
 * 根据配准结果计算完整的几何测量数据
-* @todo 根据真实的姿态值计算配准质量指标
 */
 MeasurementData PoseEstimator::calculateMeasurements(
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
@@ -454,7 +536,9 @@ MeasurementData PoseEstimator::calculateMeasurements(
 */
 void PoseEstimator::setProcessingParameters(const pose_measurement::ProcessingParameters& params) {
     if (cloud_processor_) {
-        cloud_processor_->setParameters(params);
+        // 创建一个参数副本，并同步下采样设置
+        pose_measurement::ProcessingParameters sync_params = params;
+        cloud_processor_->setParameters(sync_params);
     }
     
     // 同步更新基础参数
@@ -463,6 +547,8 @@ void PoseEstimator::setProcessingParameters(const pose_measurement::ProcessingPa
     if (measurement_calculator_) {
         measurement_calculator_->setVoxelSize(params.voxel_size);
     }
+
+    ROS_INFO("Processing parameters updated - voxel_size: %.6f, downsampling: %s", voxel_size_, enable_downsampling_ ? "enabled" : "disabled");
 }
 
 /**

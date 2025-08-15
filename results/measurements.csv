@@ -1,0 +1,2 @@
+filename,processing_time,downsampling_enabled,tx,ty,tz,roll,pitch,yaw,length,width,height,volume,surface_area,fitness,rmse
+/home/moyuan/ny_qyzc_ws/dataset/rgbd-dataset/keyboard/keyboard_1/keyboard_1_1_12.pcd,2.467163,false,0.279713,0.061226,0.037496,-2.896514,-10.277266,23.656439,0.182521,0.254216,0.126197,0.005856,0.203029,0.000014,0.003799

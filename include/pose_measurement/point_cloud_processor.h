@@ -40,6 +40,7 @@ namespace pose_measurement {
 struct ProcessingParameters {
     // ===== 滤波参数 =====
     float voxel_size = 0.005f;                    // 体素大小（米），控制下采样精度
+    bool enable_downsampling = true;              // 下采样开关
     int statistical_k = 50;                       // 统计滤波邻居点数量
     float statistical_stddev = 1.0f;              // 统计滤波标准差倍数
     float radius_outlier_radius = 0.01f;          // 半径滤波搜索半径（米）

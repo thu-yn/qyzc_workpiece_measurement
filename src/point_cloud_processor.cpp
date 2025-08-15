@@ -75,7 +75,11 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudProcessor::processPointCloud(
     // 步骤2：下采样
     // 减少数据量，提高后续处理速度
     auto cloud_downsampled = downsample(cloud_filtered);
-    printCloudInfo(cloud_downsampled, "After downsampling");
+    if (params_.enable_downsampling) {
+        printCloudInfo(cloud_downsampled, "After downsampling");
+    } else {
+        printCloudInfo(cloud_downsampled, "Downsampling skipped");
+    }
     
     // 步骤3：移除平面（可选）
     // 根据参数决定是否移除背景平面
@@ -136,13 +140,28 @@ pcl::PointCloud<pcl::PointXYZ>::Ptr PointCloudProcessor::downsample(
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
     
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZ>);
+
+    // 如果禁用下采样，直接返回原点云
+    if (!params_.enable_downsampling) {
+        ROS_INFO("Downsampling disabled - returning original cloud");
+        return cloud;
+    }
     
+    // 检查体素大小
+    if (params_.voxel_size <= 0.0f) {
+        ROS_WARN("Invalid voxel size (%.6f), skipping downsampling", params_.voxel_size);
+        return cloud;
+    }
+
     // 体素网格下采样
     // 原理：将3D空间划分为立方体网格，每个网格内的点用质心代替
     // 优点：既减少数据量又保持几何特征
     voxel_filter_.setInputCloud(cloud);
     voxel_filter_.setLeafSize(params_.voxel_size, params_.voxel_size, params_.voxel_size);
     voxel_filter_.filter(*cloud_filtered);
+
+    ROS_INFO("Downsampling applied: %zu -> %zu points (voxel size: %.6f)", 
+             cloud->size(), cloud_filtered->size(), params_.voxel_size);
     
     return cloud_filtered;
 }
