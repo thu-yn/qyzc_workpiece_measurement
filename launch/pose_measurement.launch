@@ -6,7 +6,7 @@
   1. 配置系统运行参数（文件路径、算法参数、功能开关）
   2. 支持两种运行模式（单次处理和交互式处理）
   3. 支持两种处理模式（基础模式和扩展模式）
-  4. 支持变换点云保存功能（新增）
+  4. 支持变换点云保存功能
   5. 提供参数验证和默认值设置
   
   使用方法:
@@ -54,7 +54,7 @@
      <!-- ===== 功能开关参数 ===== -->
      
      <!-- 下采样开关（true启用，false保持原始分辨率）-->
-     <arg name="enable_downsampling" default="true" 
+     <arg name="enable_downsampling" default="false" 
           doc="Enable voxel grid downsampling. Disable for maximum precision" />
      
      <!-- 扩展处理模式开关（true启用高级功能，false使用基础模式）-->
@@ -80,7 +80,7 @@
           doc="Enable saving transformed point clouds for visualization and comparison" />
      
      <!-- 变换点云输出目录 -->
-     <arg name="transformed_cloud_output_dir" default="./results/" 
+     <arg name="transformed_cloud_output_dir" default="./debug/" 
           doc="Output directory for transformed point clouds" />
      
      <!-- ===== 节点启动配置 ===== -->
