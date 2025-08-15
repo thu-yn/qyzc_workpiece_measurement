@@ -163,7 +163,7 @@ public:
     */
     MeasurementData processTargetCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud);
     
-    // ===== 变换点云功能（新增）=====
+    // ===== 变换点云功能 =====
     
     /**
     * @brief 生成变换后的点云
@@ -444,6 +444,23 @@ private:
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud,
         Eigen::Matrix3f& eigenvectors,
         Eigen::Vector3f& eigenvalues);
+
+    /**
+    * @brief 计算工件相对于标准位置的角度偏差
+    * @param rotation_matrix 配准得到的旋转矩阵
+    * @return 角度偏差数组（弧度）
+    * 
+    * 返回的角度数组包含：
+    * [0] Roll偏差
+    * [1] Pitch偏差  
+    * [2] Yaw偏差
+    * [3] 总旋转偏差
+    * [4] 旋转轴与X轴夹角
+    * [5] 旋转轴与Y轴夹角
+    * [6] 旋转轴与Z轴夹角
+    * [7] 综合偏差指标
+    */
+    std::vector<float> calculateWorkpieceRelativeAngles(const Eigen::Matrix3f& rotation_matrix);
     
     // ===== 私有成员变量 =====
     

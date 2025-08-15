@@ -173,6 +173,7 @@ private:
             ROS_INFO("Transformed cloud output directory: %s", transformed_cloud_output_dir_.c_str());
         }
         ROS_INFO("====================");
+        std::cout << std::endl;
     }
     
     /**
@@ -429,16 +430,6 @@ private:
         std::cout << "Volume: " << std::fixed << std::setprecision(6) << data.volume << " [m³]" << std::endl;
         std::cout << "Surface Area: " << std::fixed << std::setprecision(6) << data.surface_area << " [m²]" << std::endl;
         
-        if (!data.key_angles.empty()) {
-            std::cout << "Key Angles: ";
-            for (size_t i = 0; i < data.key_angles.size(); ++i) {
-                std::cout << std::fixed << std::setprecision(2) 
-                        << data.key_angles[i] * 180.0 / M_PI << "°";
-                if (i < data.key_angles.size() - 1) std::cout << ", ";
-            }
-            std::cout << std::endl;
-        }
-        
         // 配准质量指标
         std::cout << "\n--- Registration Quality ---" << std::endl;
         std::cout << "Fitness Score: " << std::fixed << std::setprecision(6) << data.registration_fitness << std::endl;
@@ -460,16 +451,26 @@ private:
     * 创建CSV文件并写入表头
     */
     void initializeCSVFile() {
+        // 检查文件是否已经存在
+        if (std::ifstream(output_csv_path_).good()) {
+            ROS_INFO("CSV file already exists, will append data to: %s", output_csv_path_.c_str());
+            std::cout << std::endl;
+            return;  // 文件已存在，不需要重新创建表头
+        }
+        
+        // 文件不存在，创建新文件并写入表头
         std::ofstream file(output_csv_path_);
         if (!file.is_open()) {
             ROS_ERROR("Failed to create CSV file: %s", output_csv_path_.c_str());
             return;
         }
         
-        file << "filename,processing_time,downsampling_enabled,"
-            << "tx,ty,tz,roll,pitch,yaw,"
-            << "length,width,height,volume,surface_area,"
-            << "fitness,rmse";
+        file << "filename,processing_time,advance_measurement_enabled,"
+             << "tx,ty,tz,roll,pitch,yaw,"                          // 配准的平移和旋转
+             << "length,width,height,volume,surface_area,"          // 几何测量
+             << "roll_deviation,pitch_deviation,yaw_deviation,"     // 角度偏差
+             << "total_rotation_deviation,composite_deviation,"     // 总体偏差
+             << "fitness,rmse";                                     // 配准质量
         
         // 添加变换点云路径列（如果启用）
         if (enable_transformed_cloud_save_) {
@@ -479,7 +480,8 @@ private:
         file << std::endl;
         
         file.close();
-        ROS_INFO("CSV file initialized: %s", output_csv_path_.c_str());
+        ROS_INFO("CSV file initialized with updated format: %s", output_csv_path_.c_str());
+        std::cout << std::endl;
     }
     
     /**
@@ -487,37 +489,60 @@ private:
     * 将测量结果追加到CSV文件中
     */
     void saveToCSV(const MeasurementData& data, const std::string& filename, 
-                double processing_time, const std::string& transformed_cloud_path = "") {
+        double processing_time, const std::string& transformed_cloud_path) {
         std::ofstream file(output_csv_path_, std::ios::app);
         if (!file.is_open()) {
-            ROS_ERROR("Failed to open CSV file for writing");
-            return;
+        ROS_ERROR("Failed to open CSV file for writing");
+        return;
         }
-        
+
         file << filename << ","
-            << std::fixed << std::setprecision(6) << processing_time << ","
-            << (enable_downsampling_ ? "true" : "false") << ","
-            << data.translation.x() << ","
-            << data.translation.y() << ","
-            << data.translation.z() << ","
-            << data.euler_angles.x() * 180.0 / M_PI << ","
-            << data.euler_angles.y() * 180.0 / M_PI << ","
-            << data.euler_angles.z() * 180.0 / M_PI << ","
-            << data.length << ","
-            << data.width << ","
-            << data.height << ","
-            << data.volume << ","
-            << data.surface_area << ","
-            << data.registration_fitness << ","
-            << data.registration_rmse;
-        
+        << std::fixed << std::setprecision(6) << processing_time << ","
+        << (enable_advanced_processing_ ? "true" : "false") << ","
+
+        // 配准结果
+        << data.translation.x() << ","
+        << data.translation.y() << ","
+        << data.translation.z() << ","
+        << data.euler_angles.x() * 180.0 / M_PI << ","     
+        << data.euler_angles.y() * 180.0 / M_PI << ","
+        << data.euler_angles.z() * 180.0 / M_PI << ","
+
+        // 几何测量
+        << data.length << ","
+        << data.width << ","
+        << data.height << ","
+        << data.volume << ","
+        << data.surface_area << ",";
+
+        // 角度偏差信息
+        if (!enable_advanced_processing_ && data.key_angles.size() >= 8) {
+            file << data.key_angles[0] * 180.0 / M_PI << ","   // Roll偏差（度）
+            << data.key_angles[1] * 180.0 / M_PI << ","        // Pitch偏差（度）
+            << data.key_angles[2] * 180.0 / M_PI << ","        // Yaw偏差（度）
+            << data.key_angles[3] * 180.0 / M_PI << ","        // 总旋转偏差（度）
+            << data.key_angles[7] * 180.0 / M_PI << ",";       // 综合偏差（度）
+        } else if (enable_advanced_processing_ && data.key_angles.size() >= 20) {
+            file << data.key_angles[12] * 180.0 / M_PI << ","   // Roll偏差（度）
+            << data.key_angles[13] * 180.0 / M_PI << ","        // Pitch偏差（度）
+            << data.key_angles[14] * 180.0 / M_PI << ","        // Yaw偏差（度）
+            << data.key_angles[15] * 180.0 / M_PI << ","        // 总旋转偏差（度）
+            << data.key_angles[19] * 180.0 / M_PI << ",";       // 综合偏差（度）
+        } else {
+            // 兼容性处理：如果角度数据不足，填充0
+            file << "0,0,0,0,0,";
+        }
+
+        // 配准质量
+        file << data.registration_fitness << ","
+        << data.registration_rmse;
+
         // 添加变换点云路径（如果启用）
         if (enable_transformed_cloud_save_) {
             file << "," << (transformed_cloud_path.empty() ? "not_saved" : transformed_cloud_path);
         }
-        
+
         file << std::endl;
-        
         file.close();
     }
     

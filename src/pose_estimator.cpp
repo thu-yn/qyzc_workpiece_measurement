@@ -102,7 +102,8 @@ bool PoseEstimator::loadReferenceCloud(const std::string& pcd_path) {
     
     ROS_INFO("Reference cloud preprocessing completed: %zu points", 
             reference_cloud_processed_->points.size());
-    
+    std::cout << std::endl;
+
     return true;
 }
 
@@ -125,22 +126,26 @@ MeasurementData PoseEstimator::processTargetCloud(pcl::PointCloud<pcl::PointXYZ>
         target_processed = preprocessPointCloud(target_cloud);
     }
     ROS_INFO("Target cloud preprocessing completed: %zu points", target_processed->points.size());
+    std::cout << std::endl;
     
     // 步骤2：粗配准
     // 获得初始的变换估计
     ROS_INFO("Starting coarse registration...");
     Eigen::Matrix4f coarse_transform = coarseRegistration(target_processed, reference_cloud_processed_);
+    std::cout << std::endl;
     
     // 步骤3：精配准
     // 基于粗配准结果进行精确优化
     ROS_INFO("Starting fine registration...");
     Eigen::Matrix4f fine_transform = fineRegistration(target_processed, reference_cloud_processed_, coarse_transform);
+    std::cout << std::endl;
     
     // 步骤4：计算测量结果
     result = calculateMeasurements(target_processed, fine_transform);
     
     ROS_INFO("Registration completed - Fitness: %.6f, RMSE: %.6f", 
             result.registration_fitness, result.registration_rmse);
+    std::cout << std::endl;
     
     return result;
 }
@@ -447,45 +452,71 @@ MeasurementData PoseEstimator::calculateMeasurements(
     pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZ>);
     pcl::transformPointCloud(*cloud, *transformed_cloud, transformation);
     
-    // 计算基础包围盒尺寸
-    pcl::PointXYZ min_pt, max_pt;
-    pcl::getMinMax3D(*transformed_cloud, min_pt, max_pt);
-    
-    result.length = max_pt.x - min_pt.x;
-    result.width = max_pt.y - min_pt.y;
-    result.height = max_pt.z - min_pt.z;
-    
-    // 根据模式选择测量算法
+    // ===== 几何尺寸计算 =====
     if (enable_advanced_measurements_) {
-        // 扩展模式：使用高精度几何测量
+        // ===== 扩展模式：使用高精度几何测量 =====
+        ROS_INFO("Using advanced measurements with OBB-based dimensions");
+        std::cout << std::endl;
+        
+        // 使用MeasurementCalculator计算完整几何特征
         result.geometric_features = measurement_calculator_->calculateGeometricFeatures(transformed_cloud);
+        
+        // 从扩展特征中提取长宽高（基于OBB的精确测量）
+        result.length = result.geometric_features.length;
+        result.width = result.geometric_features.width;
+        result.height = result.geometric_features.height;
         result.volume = result.geometric_features.volume;
         result.surface_area = result.geometric_features.surface_area;
         
         // 合并高级角度特征
         auto& advanced_angles = result.geometric_features.characteristic_angles;
         result.key_angles.insert(result.key_angles.end(), advanced_angles.begin(), advanced_angles.end());
+        
+        ROS_INFO("Advanced measurements - Length: %.6f, Width: %.6f, Height: %.6f", 
+                result.length, result.width, result.height);
+        std::cout << std::endl;
     } else {
+        // ===== 基础模式：使用轴对齐包围盒测量 =====
+        ROS_INFO("Using basic measurements with AABB-based dimensions");
+        std::cout << std::endl;
+        
+        // 计算轴对齐包围盒尺寸（保持原有逻辑，确保兼容性）
+        pcl::PointXYZ min_pt, max_pt;
+        pcl::getMinMax3D(*transformed_cloud, min_pt, max_pt);
+        
+        float length = max_pt.x - min_pt.x;
+        float width = max_pt.y - min_pt.y;
+        float height = max_pt.z - min_pt.z;
+        
+        // 按大小排序分配给长宽高
+        std::vector<float> dimensions = {length, width, height};
+        std::sort(dimensions.rbegin(), dimensions.rend());  // 降序排列
+        
+        result.length = dimensions[0];   // 最大尺寸
+        result.width = dimensions[1];    // 中等尺寸
+        result.height = dimensions[2];   // 最小尺寸
+        
         // 基础模式：使用简单的体积和表面积估算
         result.volume = result.length * result.width * result.height;
         result.surface_area = 2.0f * (result.length * result.width + 
                                     result.width * result.height + 
                                     result.height * result.length);
+        
+        ROS_INFO("Basic measurements - Length: %.6f, Width: %.6f, Height: %.6f", 
+                result.length, result.width, result.height);
+        std::cout << std::endl;
     }
+
+    // ===== 计算相对角度特征 =====
+
+    ROS_INFO("Calculating relative angles (workpiece vs. standard position)");
     
-    // 计算基于主轴的关键角度
-    Eigen::Matrix3f cloud_eigenvectors;
-    Eigen::Vector3f cloud_eigenvalues;
-    computePrincipalAxes(transformed_cloud, cloud_eigenvectors, cloud_eigenvalues);
+    // 核心修改：直接从配准变换矩阵计算相对角度
+    auto relative_angles = calculateWorkpieceRelativeAngles(rotation);
+    result.key_angles.insert(result.key_angles.end(), relative_angles.begin(), relative_angles.end());
     
-    // 计算主轴与坐标轴的夹角
-    for (int i = 0; i < 3; ++i) {
-        Eigen::Vector3f axis = Eigen::Vector3f::Unit(i);
-        float angle = std::acos(std::clamp(std::abs(cloud_eigenvectors.col(0).dot(axis)), 0.0f, 1.0f));
-        result.key_angles.push_back(angle);
-    }
-    
-    // 计算配准质量指标
+    // ===== 计算配准质量指标 =====
+
     // 使用简单的ICP评估来获得适配度
     pcl::IterativeClosestPoint<pcl::PointXYZ, pcl::PointXYZ> icp_eval;
     icp_eval.setInputSource(transformed_cloud);
@@ -528,6 +559,91 @@ MeasurementData PoseEstimator::calculateMeasurements(
     }
     
     return result;
+}
+
+/**
+* @brief 计算工件相对于标准位置的角度偏差
+* 这是解决角度计算问题的核心函数
+*/
+std::vector<float> PoseEstimator::calculateWorkpieceRelativeAngles(const Eigen::Matrix3f& rotation_matrix) {
+    std::vector<float> angles;
+    
+    // 1. 计算欧拉角偏差（相对于参考点云位置）
+    Eigen::Vector3f euler = rotationMatrixToEulerAngles(rotation_matrix);
+    
+    float roll_deviation = std::abs(euler.x());   // Roll偏差
+    float pitch_deviation = std::abs(euler.y());  // Pitch偏差  
+    float yaw_deviation = std::abs(euler.z());    // Yaw偏差
+    
+    angles.push_back(roll_deviation);
+    angles.push_back(pitch_deviation);
+    angles.push_back(yaw_deviation);
+    
+    // 2. 计算总旋转偏差（轴角表示）
+    Eigen::AngleAxisf angle_axis(rotation_matrix);
+    float total_rotation_deviation = std::abs(angle_axis.angle());
+    angles.push_back(total_rotation_deviation);
+    
+    // 3. 计算旋转轴方向（用于分析旋转特性）
+    Eigen::Vector3f rotation_axis = angle_axis.axis();
+    
+    // 计算旋转轴与各坐标轴的夹角
+    float axis_x_angle = std::acos(std::clamp(std::abs(rotation_axis.x()), 0.0f, 1.0f));
+    float axis_y_angle = std::acos(std::clamp(std::abs(rotation_axis.y()), 0.0f, 1.0f));
+    float axis_z_angle = std::acos(std::clamp(std::abs(rotation_axis.z()), 0.0f, 1.0f));
+    
+    angles.push_back(axis_x_angle);
+    angles.push_back(axis_y_angle);
+    angles.push_back(axis_z_angle);
+    
+    // 4. 计算综合旋转偏差指标（用于质量评估）
+    float composite_deviation = std::sqrt(
+        roll_deviation * roll_deviation + 
+        pitch_deviation * pitch_deviation + 
+        yaw_deviation * yaw_deviation
+    );
+    angles.push_back(composite_deviation);
+    
+    // 输出调试信息
+    ROS_INFO("Workpiece orientation analysis:");
+    ROS_INFO("--- Euler Angle Absolute Deviations vs Reference PointCloud ---");
+    ROS_INFO("  Roll deviation: %.2f deg (%.4f rad)", roll_deviation * 180.0/M_PI, roll_deviation);
+    ROS_INFO("  Pitch deviation: %.2f deg (%.4f rad)", pitch_deviation * 180.0/M_PI, pitch_deviation);
+    ROS_INFO("  Yaw deviation: %.2f deg (%.4f rad)", yaw_deviation * 180.0/M_PI, yaw_deviation);
+    std::cout << std::endl;
+    
+    ROS_INFO("--- Axis-Angle Representation ---");
+    ROS_INFO("  Total rotation angle: %.2f deg (%.4f rad)", total_rotation_deviation * 180.0/M_PI, total_rotation_deviation);
+    ROS_INFO("  Rotation-axis: [%.4f, %.4f, %.4f]", rotation_axis.x(), rotation_axis.y(), rotation_axis.z());
+    ROS_INFO("  Rotation-axis magnitude: %.6f (should be 1.0)", rotation_axis.norm());
+    std::cout << std::endl;
+    
+    ROS_INFO("--- Rotation Axis Analysis ---");
+    ROS_INFO("  Rotation-axis vs X-axis angle: %.2f deg", axis_x_angle * 180.0/M_PI);
+    ROS_INFO("  Rotation-axis vs Y-axis angle: %.2f deg", axis_y_angle * 180.0/M_PI);
+    ROS_INFO("  Rotation-axis vs Z-axis angle: %.2f deg", axis_z_angle * 180.0/M_PI);
+    std::cout << std::endl;
+    
+    // 分析旋转轴的主要方向
+    float max_component = std::max({std::abs(rotation_axis.x()), std::abs(rotation_axis.y()), std::abs(rotation_axis.z())});
+    std::string primary_direction;
+    if (std::abs(rotation_axis.x()) == max_component) {
+        primary_direction = rotation_axis.x() > 0 ? "+X" : "-X";
+    } else if (std::abs(rotation_axis.y()) == max_component) {
+        primary_direction = rotation_axis.y() > 0 ? "+Y" : "-Y";
+    } else {
+        primary_direction = rotation_axis.z() > 0 ? "+Z" : "-Z";
+    }
+    ROS_INFO("  Primary axis direction: %s (component: %.4f)", primary_direction.c_str(), max_component);
+    
+    ROS_INFO("--- Summary ---");
+    ROS_INFO("  Composite deviation: %.2f deg (%.4f rad)", composite_deviation * 180.0/M_PI, composite_deviation);
+    ROS_INFO("  Equivalent to: Rotate %.2f deg around axis [%.3f, %.3f, %.3f]", 
+             total_rotation_deviation * 180.0/M_PI, 
+             rotation_axis.x(), rotation_axis.y(), rotation_axis.z());
+    std::cout << std::endl;
+    
+    return angles;
 }
 
 /**

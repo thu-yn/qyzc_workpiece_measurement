@@ -232,7 +232,12 @@ std::vector<float> MeasurementCalculator::calculateCharacteristicAngles(
         angles.push_back(angle_x);
         angles.push_back(angle_y);
         angles.push_back(angle_z);
+
+        ROS_INFO("Main-axis %d angle vs X-axis: %.2f deg", i, angle_x * 180.0 / M_PI);
+        ROS_INFO("Main-axis %d angle vs Y-axis: %.2f deg", i, angle_y * 180.0 / M_PI);
+        ROS_INFO("Main-axis %d angle vs Z-axis: %.2f deg", i, angle_z * 180.0 / M_PI);
     }
+    std::cout << std::endl;
     
     // 添加主轴之间的夹角
     // 这些角度提供了物体形状的额外信息
@@ -243,6 +248,11 @@ std::vector<float> MeasurementCalculator::calculateCharacteristicAngles(
     angles.push_back(angle_12);
     angles.push_back(angle_13);
     angles.push_back(angle_23);
+
+    ROS_INFO("Main-axis 1 angle vs Main-axis 2: %.2f deg", angle_12 * 180.0 / M_PI);
+    ROS_INFO("Main-axis 1 angle vs Main-axis 3: %.2f deg", angle_13 * 180.0 / M_PI);
+    ROS_INFO("Main-axis 2 angle vs Main-axis 3: %.2f deg", angle_23 * 180.0 / M_PI);
+    std::cout << std::endl;
     
     return angles;
 }

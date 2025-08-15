@@ -34,7 +34,7 @@
           doc="Path to target point cloud PCD file (optional, empty for interactive mode)" />
      
      <!-- CSV输出文件路径 -->
-     <arg name="output_csv" default="measurements.csv" 
+     <arg name="output_csv" default="/home/moyuan/ny_qyzc_ws/src/pose_measurement/results/measurements.csv" 
           doc="Output CSV file path for measurement results" />
      
      <!-- ===== 核心算法参数 ===== -->
@@ -58,15 +58,15 @@
           doc="Enable voxel grid downsampling. Disable for maximum precision" />
      
      <!-- 扩展处理模式开关（true启用高级功能，false使用基础模式）-->
-     <arg name="enable_advanced" default="false" 
+     <arg name="enable_advanced" default="true" 
           doc="Enable advanced processing mode with plane removal and clustering" />
      
      <!-- 平面移除开关（仅在扩展模式下有效）-->
-     <arg name="enable_plane_removal" default="true" 
+     <arg name="enable_plane_removal" default="false" 
           doc="Enable plane removal in advanced mode" />
      
      <!-- 聚类分割开关（仅在扩展模式下有效）-->
-     <arg name="enable_clustering" default="true" 
+     <arg name="enable_clustering" default="false" 
           doc="Enable clustering in advanced mode" />
      
      <!-- CSV输出开关 -->
@@ -76,37 +76,37 @@
      <!-- ===== 变换点云功能参数 ===== -->
      
      <!-- 变换点云保存开关 -->
-     <arg name="enable_transformed_cloud_save" default="false" 
+     <arg name="enable_transformed_cloud_save" default="true" 
           doc="Enable saving transformed point clouds for visualization and comparison" />
      
      <!-- 变换点云输出目录 -->
-     <arg name="transformed_cloud_output_dir" default="./debug/" 
+     <arg name="transformed_cloud_output_dir" default="/home/moyuan/ny_qyzc_ws/src/pose_measurement/debug/" 
           doc="Output directory for transformed point clouds" />
      
      <!-- ===== 节点启动配置 ===== -->
      
-     <node name="pose_measurement_node" pkg="pose_measurement" type="pose_measurement_node" output="screen">
+     <node name="pose_measurement_node" pkg="pose_measurement" type="pose_measurement_node" output="screen" required="true">
        
-       <!-- 文件路径参数传递 -->
-       <param name="reference_pcd_path" value="$(arg reference_pcd)" />
-       <param name="target_pcd_path" value="$(arg target_pcd)" />
-       <param name="output_csv_path" value="$(arg output_csv)" />
-       
-       <!-- 核心算法参数传递 -->
-       <param name="voxel_size" value="$(arg voxel_size)" type="double" />
-       <param name="icp_max_iterations" value="$(arg icp_max_iter)" type="int" />
-       <param name="icp_transformation_epsilon" value="$(arg icp_epsilon)" type="double" />
-       
-       <!-- 功能开关参数传递 -->
-       <param name="enable_downsampling" value="$(arg enable_downsampling)" type="bool" />
-       <param name="enable_advanced_processing" value="$(arg enable_advanced)" type="bool" />
-       <param name="enable_plane_removal" value="$(arg enable_plane_removal)" type="bool" />
-       <param name="enable_clustering" value="$(arg enable_clustering)" type="bool" />
-       <param name="enable_csv_output" value="$(arg enable_csv_output)" type="bool" />
-       
-       <!-- 变换点云功能参数传递 -->
-       <param name="enable_transformed_cloud_save" value="$(arg enable_transformed_cloud_save)" type="bool" />
-       <param name="transformed_cloud_output_dir" value="$(arg transformed_cloud_output_dir)" type="str" />
+          <!-- 文件路径参数传递 -->
+          <param name="reference_pcd_path" value="$(arg reference_pcd)" />
+          <param name="target_pcd_path" value="$(arg target_pcd)" />
+          <param name="output_csv_path" value="$(arg output_csv)" />
+          
+          <!-- 核心算法参数传递 -->
+          <param name="voxel_size" value="$(arg voxel_size)" type="double" />
+          <param name="icp_max_iterations" value="$(arg icp_max_iter)" type="int" />
+          <param name="icp_transformation_epsilon" value="$(arg icp_epsilon)" type="double" />
+          
+          <!-- 功能开关参数传递 -->
+          <param name="enable_downsampling" value="$(arg enable_downsampling)" type="bool" />
+          <param name="enable_advanced_processing" value="$(arg enable_advanced)" type="bool" />
+          <param name="enable_plane_removal" value="$(arg enable_plane_removal)" type="bool" />
+          <param name="enable_clustering" value="$(arg enable_clustering)" type="bool" />
+          <param name="enable_csv_output" value="$(arg enable_csv_output)" type="bool" />
+          
+          <!-- 变换点云功能参数传递 -->
+          <param name="enable_transformed_cloud_save" value="$(arg enable_transformed_cloud_save)" type="bool" />
+          <param name="transformed_cloud_output_dir" value="$(arg transformed_cloud_output_dir)" type="str" />
        
      </node>
      
