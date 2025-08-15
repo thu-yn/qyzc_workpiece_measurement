@@ -169,10 +169,10 @@ if (enable_advanced_processing_ && data.key_angles.size() >= 20) {
 
 ## 📚 相关文档
 
-- [pose_estimator.h](include/pose_measurement/pose_estimator.h) - 姿态估计器接口定义
-- [measurement_calculator.h](include/pose_measurement/measurement_calculator.h) - 几何测量计算器接口
-- [pose_measurement_node.cpp](src/pose_measurement_node.cpp) - CSV输出实现
-- [README.md](README.md) - 项目完整文档
+- [pose_estimator.h](../include/pose_measurement/pose_estimator.h) - 姿态估计器接口定义
+- [measurement_calculator.h](../include/pose_measurement/measurement_calculator.h) - 几何测量计算器接口
+- [pose_measurement_node.cpp](../src/pose_measurement_node.cpp) - CSV输出实现
+- [README.md](../README.md) - 项目完整文档
 
 ---
 
