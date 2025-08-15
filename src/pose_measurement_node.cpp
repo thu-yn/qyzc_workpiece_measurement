@@ -1,15 +1,15 @@
 /**
-* @file pose_measurement_node.cpp
-* @brief 工件姿态估计和测量系统的主控制节点
+* 文件名: pose_measurement_node.cpp
+* 文件作用: 工件姿态估计和测量系统的主控制节点
 * 
-* 功能：
-* - 参数管理：读取和配置系统参数（体素大小、ICP参数、扩展模式开关等）
-* - 工作流控制：协调点云加载、姿态估计、几何测量的执行流程
-* - 双模式处理：支持单次处理模式和交互式连续处理模式
-* - 结果输出：格式化终端显示和CSV文件保存
-* - 错误处理：完善的文件加载检查和异常处理
-* - 下采样控制：支持禁用下采样以保持高精度点云
-* - 变换点云：支持生成和保存变换后的点云用于可视化对比（新增功能）
+* 主要功能需求:
+* 1. 参数管理：读取和配置系统参数（体素大小、ICP参数、扩展模式开关等）
+* 2. 工作流控制：协调点云加载、姿态估计、几何测量的执行流程
+* 3. 双模式处理：支持单次处理模式和交互式连续处理模式
+* 4. 结果输出：格式化终端显示和CSV文件保存
+* 5. 错误处理：完善的文件加载检查和异常处理
+* 6. 下采样控制：支持禁用下采样以保持高精度点云
+* 7. 变换点云：支持生成和保存变换后的点云用于可视化对比（新增功能）
 * 
 * 作为系统入口点，该节点通过PoseEstimator调用核心算法模块，
 * 为用户和外部脚本提供统一的ROS接口。
@@ -28,37 +28,40 @@
 
 class PoseMeasurementNode {
 public:
+    /**
+    * @brief 构造函数：初始化节点参数和配置
+    */
     PoseMeasurementNode() : nh_("~") {
-        // Initialize parameters
+        // 初始化参数
         // 文件路径参数
         nh_.param<std::string>("reference_pcd_path", reference_pcd_path_, "");
         nh_.param<std::string>("target_pcd_path", target_pcd_path_, "");
         nh_.param<std::string>("output_csv_path", output_csv_path_, "measurements.csv");
         
         // 核心处理参数
-        nh_.param<float>("voxel_size", voxel_size_, 0.005f);  // 5mm
+        nh_.param<float>("voxel_size", voxel_size_, 0.005f);  // 默认5毫米
         nh_.param<int>("icp_max_iterations", icp_max_iterations_, 100);
         nh_.param<float>("icp_transformation_epsilon", icp_transformation_epsilon_, 1e-6);
         
-        // 功能开关
+        // 功能开关参数
         nh_.param<bool>("enable_csv_output", enable_csv_output_, true);
         nh_.param<bool>("enable_downsampling", enable_downsampling_, true); 
         nh_.param<bool>("enable_advanced_processing", enable_advanced_processing_, false);
         nh_.param<bool>("enable_plane_removal", enable_plane_removal_, true);
         nh_.param<bool>("enable_clustering", enable_clustering_, true);
         
-        // 变换点云功能参数（新增）
+        // 变换点云功能参数
         nh_.param<bool>("enable_transformed_cloud_save", enable_transformed_cloud_save_, false);
         nh_.param<std::string>("transformed_cloud_output_dir", transformed_cloud_output_dir_, "./results/");
         
         // 验证参数合理性
         validateParameters();
         
-        // Initialize pose estimator
+        // 初始化姿态估计器
         pose_estimator_ = std::make_shared<PoseEstimator>();
         configurePoseEstimator();
         
-        // Initialize CSV file
+        // 初始化CSV文件
         if (enable_csv_output_) {
             initializeCSVFile();
         }
@@ -67,8 +70,11 @@ public:
         printConfiguration();
     }
     
+    /**
+    * @brief 主运行函数：控制整个处理流程
+    */
     bool run() {
-        // Load reference cloud
+        // 加载参考点云
         if (reference_pcd_path_.empty()) {
             ROS_ERROR("Reference PCD path not specified!");
             return false;
@@ -80,17 +86,21 @@ public:
             return false;
         }
         
-        // Process target cloud(s)
+        // 处理目标点云
         if (!target_pcd_path_.empty()) {
-            // Single target cloud mode
+            // 单目标点云处理模式
             return processSingleTarget();
         } else {
-            // Interactive mode - process multiple clouds
+            // 交互模式 - 处理多个点云
             return processInteractiveMode();
         }
     }
     
 private:
+    /**
+    * @brief 验证参数合理性
+    * 检查用户输入的参数是否在合理范围内，并提供警告和自动修正
+    */
     void validateParameters() {
         if (enable_downsampling_ && voxel_size_ <= 0.0f) {
             ROS_WARN("Downsampling enabled but voxel_size <= 0 (%.6f). Setting voxel_size to 0.005m", voxel_size_);
@@ -113,17 +123,19 @@ private:
         }
     }
     
+    /**
+    * @brief 配置姿态估计器
+    * 根据读取的参数配置PoseEstimator对象
+    */
     void configurePoseEstimator() {
         // 设置基础参数
         pose_estimator_->setVoxelSize(voxel_size_);
         pose_estimator_->setICPMaxIterations(icp_max_iterations_);
         pose_estimator_->setICPTransformationEpsilon(icp_transformation_epsilon_);
         pose_estimator_->setEnableAdvancedMeasurements(enable_advanced_processing_);
-        
-        // 设置下采样开关
         pose_estimator_->setEnableDownsampling(enable_downsampling_);
         
-        // Configure advanced processing if enabled
+        // 如果启用高级处理，配置相关参数
         if (enable_advanced_processing_) {
             pose_measurement::ProcessingParameters params;
             params.voxel_size = voxel_size_;
@@ -135,6 +147,10 @@ private:
         }
     }
     
+    /**
+    * @brief 打印系统配置信息
+    * 向用户显示当前的参数配置，便于确认和调试
+    */
     void printConfiguration() {
         ROS_INFO("=== Configuration ===");
         ROS_INFO("Downsampling: %s", enable_downsampling_ ? "ENABLED" : "DISABLED");
@@ -159,6 +175,10 @@ private:
         ROS_INFO("====================");
     }
     
+    /**
+    * @brief 处理单个目标点云
+    * 用于批处理脚本调用的单文件处理模式
+    */
     bool processSingleTarget() {
         pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZ>);
         
@@ -170,12 +190,12 @@ private:
         
         ROS_INFO("Target cloud loaded: %zu points", target_cloud->size());
         
-        // Process and get measurements
+        // 处理并获取测量结果
         auto start_time = ros::Time::now();
         MeasurementData result = pose_estimator_->processTargetCloud(target_cloud);
         auto processing_time = (ros::Time::now() - start_time).toSec();
         
-        // Handle transformed cloud save if enabled
+        // 如果启用了变换点云保存功能，则保存变换后的点云
         std::string transformed_cloud_path;
         if (enable_transformed_cloud_save_) {
             transformed_cloud_path = generateTransformedCloudPath(target_pcd_path_);
@@ -184,10 +204,10 @@ private:
             }
         }
         
-        // Display results
+        // 显示结果
         displayResults(result, processing_time, target_pcd_path_, transformed_cloud_path);
         
-        // Save to CSV
+        // 保存到CSV文件
         if (enable_csv_output_) {
             saveToCSV(result, target_pcd_path_, processing_time, transformed_cloud_path);
         }
@@ -195,6 +215,10 @@ private:
         return true;
     }
     
+    /**
+    * @brief 交互式处理模式
+    * 支持连续处理多个文件，便于手动测试和调试
+    */
     bool processInteractiveMode() {
         ROS_INFO("=== Interactive Mode ===");
         if (enable_transformed_cloud_save_) {
@@ -215,7 +239,7 @@ private:
                 continue;
             }
             
-            // Load target cloud
+            // 加载目标点云
             pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud(new pcl::PointCloud<pcl::PointXYZ>);
             if (pcl::io::loadPCDFile<pcl::PointXYZ>(input, *target_cloud) == -1) {
                 ROS_ERROR("Failed to load target cloud: %s", input.c_str());
@@ -224,12 +248,12 @@ private:
             
             ROS_INFO("Target cloud loaded: %zu points", target_cloud->size());
             
-            // Process
+            // 处理点云
             auto start_time = ros::Time::now();
             MeasurementData result = pose_estimator_->processTargetCloud(target_cloud);
             auto processing_time = (ros::Time::now() - start_time).toSec();
             
-            // Handle transformed cloud save if enabled
+            // 如果启用了变换点云保存功能，处理保存逻辑
             std::string transformed_cloud_path;
             if (enable_transformed_cloud_save_) {
                 transformed_cloud_path = getInteractiveTransformedCloudPath(input);
@@ -241,7 +265,7 @@ private:
                 }
             }
             
-            // Display and save results
+            // 显示和保存结果
             displayResults(result, processing_time, input, transformed_cloud_path);
             if (enable_csv_output_) {
                 saveToCSV(result, input, processing_time, transformed_cloud_path);
@@ -255,8 +279,7 @@ private:
     
     /**
     * @brief 生成变换后点云的保存路径
-    * @param target_pcd_path 目标点云路径
-    * @return 变换后点云的保存路径
+    * 从目标点云路径自动生成变换后点云的文件名
     */
     std::string generateTransformedCloudPath(const std::string& target_pcd_path) {
         // 提取文件名（不含路径和扩展名）
@@ -291,8 +314,7 @@ private:
     
     /**
     * @brief 在交互模式下获取变换后点云的保存路径
-    * @param target_pcd_path 目标点云路径
-    * @return 用户指定的保存路径，空字符串表示跳过保存
+    * 询问用户是否保存变换后的点云以及保存位置
     */
     std::string getInteractiveTransformedCloudPath(const std::string& target_pcd_path) {
         // 生成默认文件名建议
@@ -331,10 +353,7 @@ private:
     
     /**
     * @brief 保存变换后的点云
-    * @param target_cloud 原始目标点云
-    * @param transformation 变换矩阵
-    * @param file_path 保存路径
-    * @return 成功返回true，失败返回false
+    * 生成变换后的点云并保存到指定路径
     */
     bool saveTransformedCloud(
         pcl::PointCloud<pcl::PointXYZ>::Ptr target_cloud,
@@ -365,12 +384,16 @@ private:
         return success;
     }
     
+    /**
+    * @brief 显示测量结果
+    * 格式化输出所有测量数据到终端
+    */
     void displayResults(const MeasurementData& data, double processing_time, 
-                       const std::string& filename, const std::string& transformed_cloud_path = "") {
+                    const std::string& filename, const std::string& transformed_cloud_path = "") {
         std::cout << "\n=== Measurement Results ===" << std::endl;
         std::cout << "File: " << filename << std::endl;
         std::cout << "Processing time: " << std::fixed << std::setprecision(3) 
-                  << processing_time << " seconds" << std::endl;
+                << processing_time << " seconds" << std::endl;
         
         // 显示处理模式信息
         std::cout << "Processing mode: " << (enable_downsampling_ ? "With downsampling" : "No downsampling (full resolution)") << std::endl;
@@ -384,21 +407,21 @@ private:
             }
         }
         
-        // Pose information
+        // 姿态信息
         std::cout << "\n--- Pose Information ---" << std::endl;
         std::cout << "Translation (x, y, z): " 
-                  << std::fixed << std::setprecision(6)
-                  << data.translation.x() << ", "
-                  << data.translation.y() << ", "
-                  << data.translation.z() << " [m]" << std::endl;
+                << std::fixed << std::setprecision(6)
+                << data.translation.x() << ", "
+                << data.translation.y() << ", "
+                << data.translation.z() << " [m]" << std::endl;
         
         std::cout << "Euler Angles (roll, pitch, yaw): "
-                  << std::fixed << std::setprecision(3)
-                  << data.euler_angles.x() * 180.0 / M_PI << "°, "
-                  << data.euler_angles.y() * 180.0 / M_PI << "°, "
-                  << data.euler_angles.z() * 180.0 / M_PI << "°" << std::endl;
+                << std::fixed << std::setprecision(3)
+                << data.euler_angles.x() * 180.0 / M_PI << "°, "
+                << data.euler_angles.y() * 180.0 / M_PI << "°, "
+                << data.euler_angles.z() * 180.0 / M_PI << "°" << std::endl;
         
-        // Geometric measurements
+        // 几何测量
         std::cout << "\n--- Geometric Measurements ---" << std::endl;
         std::cout << "Length: " << std::fixed << std::setprecision(6) << data.length << " [m]" << std::endl;
         std::cout << "Width:  " << std::fixed << std::setprecision(6) << data.width << " [m]" << std::endl;
@@ -410,18 +433,18 @@ private:
             std::cout << "Key Angles: ";
             for (size_t i = 0; i < data.key_angles.size(); ++i) {
                 std::cout << std::fixed << std::setprecision(2) 
-                          << data.key_angles[i] * 180.0 / M_PI << "°";
+                        << data.key_angles[i] * 180.0 / M_PI << "°";
                 if (i < data.key_angles.size() - 1) std::cout << ", ";
             }
             std::cout << std::endl;
         }
         
-        // Quality metrics
+        // 配准质量指标
         std::cout << "\n--- Registration Quality ---" << std::endl;
         std::cout << "Fitness Score: " << std::fixed << std::setprecision(6) << data.registration_fitness << std::endl;
         std::cout << "RMSE: " << std::fixed << std::setprecision(6) << data.registration_rmse << " [m]" << std::endl;
         
-        // Transformation matrix
+        // 变换矩阵
         std::cout << "\n--- Transformation Matrix ---" << std::endl;
         for (int i = 0; i < 4; ++i) {
             for (int j = 0; j < 4; ++j) {
@@ -432,6 +455,10 @@ private:
         }
     }
     
+    /**
+    * @brief 初始化CSV输出文件
+    * 创建CSV文件并写入表头
+    */
     void initializeCSVFile() {
         std::ofstream file(output_csv_path_);
         if (!file.is_open()) {
@@ -440,9 +467,9 @@ private:
         }
         
         file << "filename,processing_time,downsampling_enabled,"
-             << "tx,ty,tz,roll,pitch,yaw,"
-             << "length,width,height,volume,surface_area,"
-             << "fitness,rmse";
+            << "tx,ty,tz,roll,pitch,yaw,"
+            << "length,width,height,volume,surface_area,"
+            << "fitness,rmse";
         
         // 添加变换点云路径列（如果启用）
         if (enable_transformed_cloud_save_) {
@@ -455,8 +482,12 @@ private:
         ROS_INFO("CSV file initialized: %s", output_csv_path_.c_str());
     }
     
+    /**
+    * @brief 保存结果到CSV文件
+    * 将测量结果追加到CSV文件中
+    */
     void saveToCSV(const MeasurementData& data, const std::string& filename, 
-                  double processing_time, const std::string& transformed_cloud_path = "") {
+                double processing_time, const std::string& transformed_cloud_path = "") {
         std::ofstream file(output_csv_path_, std::ios::app);
         if (!file.is_open()) {
             ROS_ERROR("Failed to open CSV file for writing");
@@ -464,21 +495,21 @@ private:
         }
         
         file << filename << ","
-             << std::fixed << std::setprecision(6) << processing_time << ","
-             << (enable_downsampling_ ? "true" : "false") << ","
-             << data.translation.x() << ","
-             << data.translation.y() << ","
-             << data.translation.z() << ","
-             << data.euler_angles.x() * 180.0 / M_PI << ","
-             << data.euler_angles.y() * 180.0 / M_PI << ","
-             << data.euler_angles.z() * 180.0 / M_PI << ","
-             << data.length << ","
-             << data.width << ","
-             << data.height << ","
-             << data.volume << ","
-             << data.surface_area << ","
-             << data.registration_fitness << ","
-             << data.registration_rmse;
+            << std::fixed << std::setprecision(6) << processing_time << ","
+            << (enable_downsampling_ ? "true" : "false") << ","
+            << data.translation.x() << ","
+            << data.translation.y() << ","
+            << data.translation.z() << ","
+            << data.euler_angles.x() * 180.0 / M_PI << ","
+            << data.euler_angles.y() * 180.0 / M_PI << ","
+            << data.euler_angles.z() * 180.0 / M_PI << ","
+            << data.length << ","
+            << data.width << ","
+            << data.height << ","
+            << data.volume << ","
+            << data.surface_area << ","
+            << data.registration_fitness << ","
+            << data.registration_rmse;
         
         // 添加变换点云路径（如果启用）
         if (enable_transformed_cloud_save_) {
@@ -490,10 +521,11 @@ private:
         file.close();
     }
     
+    // 私有成员变量
     ros::NodeHandle nh_;
     std::shared_ptr<PoseEstimator> pose_estimator_;
     
-    // Parameters
+    // 参数变量
     std::string reference_pcd_path_;
     std::string target_pcd_path_;
     std::string output_csv_path_;
@@ -511,6 +543,9 @@ private:
     std::string transformed_cloud_output_dir_;  // 变换点云输出目录
 };
 
+/**
+* @brief 主函数：程序入口点
+*/
 int main(int argc, char** argv) {
     ros::init(argc, argv, "pose_measurement_node");
     
